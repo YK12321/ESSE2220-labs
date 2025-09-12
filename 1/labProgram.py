@@ -67,7 +67,9 @@ def destroy():
 
 
 if __name__ == '__main__':    # Program entrance
+    setup()
     try:
-        driveMorseToBlinks(convertDataToMorse())
+        while(True):
+            driveMorseToBlinks(convertDataToMorse())
     except Exception as e:   # Handle termination gracefully
         destroy()
