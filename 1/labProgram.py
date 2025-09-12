@@ -8,6 +8,7 @@ unit = 0.2
 shortDelay = 1*unit
 longDelay = 3*unit
 varDelay = 7*unit
+LED_PIN = 26  # Define LED pin globally
 
 # Morse code dictionary for alphanumeric characters (uses map and key concept from Java course)
 MORSE_CODE = {
@@ -23,8 +24,7 @@ MORSE_CODE = {
 
 """Setup function to configure GPIO pins"""
 def setup():
-    # Define GPIO 26 pin for the LED
-    LED_PIN = 26
+    # Configure the LED pin as output
     GPIO.setup(LED_PIN, GPIO.OUT)
 
 """Convert student numbers to Morse code"""
@@ -51,16 +51,22 @@ def pinOff(duration):
 
 """Drive the Morse code to blinks on the LED"""
 def driveMorseToBlinks(morseInputArr):
-    for morseInput in morseInputArr:
+    for i, morseInput in enumerate(morseInputArr):
+        print(f"Playing student number {i+1}: {studentNumbers[i]} -> {morseInput}")
         for c in list(morseInput):
             if c == '.':
                 pinOn(shortDelay)
+                pinOff(shortDelay)  # Short delay after dot
             elif c == '-':
                 pinOn(longDelay)
+                pinOff(shortDelay)  # Short delay after dash
             elif c == ' ':
-                pinOff(longDelay)
-            pinOff(shortDelay)
-    pinOff(varDelay) # Delay between different student numbers
+                pinOff(longDelay)  # Space between characters (no additional delay needed)
+        
+        # Add delay between different student numbers (except after the last one)
+        if i < len(morseInputArr) - 1:
+            print("Delay between student numbers...")
+            pinOff(varDelay)
 
 def destroy():
     GPIO.cleanup()
@@ -69,7 +75,11 @@ def destroy():
 if __name__ == '__main__':    # Program entrance
     setup()
     try:
-        while(True):
+        while True:
             driveMorseToBlinks(convertDataToMorse())
-    except Exception as e:   # Handle termination gracefully
+    except KeyboardInterrupt:   # Handle Ctrl+C gracefully
+        print("\nProgram interrupted by user")
+    except Exception as e:   # Handle other exceptions
+        print(f"An error occurred: {e}")
+    finally:
         destroy()
