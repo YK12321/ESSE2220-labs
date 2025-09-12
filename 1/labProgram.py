@@ -63,8 +63,8 @@ def driveMorseToBlinks(morseInputArr):
             elif c == ' ':
                 pinOff(longDelay)  # Space between characters (no additional delay needed)
         
-        # Add delay between different student numbers (except after the last one)
-        if i < len(morseInputArr) - 1:
+        # Add delay between different student numbers
+        if i < len(morseInputArr):
             print("Delay between student numbers...")
             pinOff(varDelay)
 
