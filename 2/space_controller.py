@@ -42,6 +42,13 @@ class LEDDisplay:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.gpio_initialized = False
         
+        # Low battery warning state tracking
+        self.warning_active = False
+        self.warning_start_time = 0
+        self.warning_flash_count = 0
+        self.warning_led_state = False
+        self.original_led_states = None
+        
         # Validate inputs
         self._validate_inputs(batteryInput, ledPinsArrStatus, ledPinsArr)
         
@@ -126,7 +133,7 @@ class LEDDisplay:
             
         Returns:
             Mapped value
-            
+            eee
         Raises:
             LEDDisplayError: If maxInput is zero or invalid range
         """
@@ -148,13 +155,18 @@ class LEDDisplay:
     def calculateLedStates(self):
         """Calculate which LEDs should be on based on battery level - all on at 100%, turn off from end as battery decreases"""
         try:
-            ledsToEnable = int(self.mapValues(
-                self.getCurrentBattery(), 
-                self.MIN_BATTERY, 
-                self.MAX_BATTERY, 
-                self.MIN_LEDS, 
-                len(self.ledPinsArrStatus)
-            ))
+            if self.batteryInput == 0:
+                # Battery completely dead - all LEDs off
+                ledsToEnable = 0
+            else:
+                # Battery has some charge - ensure at least 1 LED is on
+                ledsToEnable = max(1, int(self.mapValues(
+                    self.getCurrentBattery(), 
+                    self.MIN_BATTERY, 
+                    self.MAX_BATTERY, 
+                    self.MIN_LEDS, 
+                    len(self.ledPinsArrStatus)
+                )))
             
             # Turn on LEDs from start of array up to ledsToEnable count
             # This means at 100% all LEDs are on, as battery decreases, LEDs turn off from the end
@@ -192,6 +204,9 @@ class LEDDisplay:
             if self.batteryInput != old_level:
                 self.calculateLedStates()
                 self.logger.info(f"Battery level updated: {old_level}% -> {self.batteryInput}%")
+                if self.batteryInput <= 15 and old_level > 15:
+                    self.logger.warning("Battery level critical: 15% or below!")
+                    self.triggerLowBatteryWarning()
             
             return self.batteryInput
             
@@ -210,6 +225,13 @@ class LEDDisplay:
             raise LEDDisplayError("GPIO not initialized")
         
         try:
+            # Handle low battery warning animation first
+            self._update_warning_animation()
+            
+            # If warning is active, don't update normal LED states
+            if self.warning_active:
+                return
+            
             # Count how many LEDs are on
             leds_on = sum(self.ledPinsArrStatus)
             
@@ -218,7 +240,7 @@ class LEDDisplay:
             
             for i, pin in enumerate(self.ledPinsArr):
                 if i < len(self.ledPinsArrStatus):
-                    if self.ledPinsArrStatus[i] == 1:
+                    if self.ledPinsArrStatus[i] == 0:
                         GPIO.output(pin, GPIO.HIGH)  # Turn LED ON
                         self.logger.debug(f"LED {i+1} (Pin {pin}): ON")
                     else:
@@ -256,3 +278,93 @@ class LEDDisplay:
             "gpio_initialized": self.gpio_initialized,
             "timestamp": time.time()
         }   
+    
+    def triggerLowBatteryWarning(self):
+        """Start non-blocking low battery warning animation"""
+        if not self.gpio_initialized:
+            self.logger.warning("Cannot trigger low battery warning - GPIO not initialized")
+            return
+        
+        if len(self.ledPinsArr) == 0:
+            self.logger.warning("Cannot trigger low battery warning - no LEDs configured")
+            return
+        
+        if self.warning_active:
+            self.logger.debug("Low battery warning already active")
+            return
+        
+        try:
+            # Save current LED states
+            self.original_led_states = self.ledPinsArrStatus.copy()
+            
+            # Initialize warning state
+            self.warning_active = True
+            self.warning_start_time = time.time()
+            self.warning_flash_count = 0
+            self.warning_led_state = False
+            
+            self.logger.warning("Starting low battery warning - non-blocking LED flash")
+            self.logger.info("Low battery warning sequence started (non-blocking)")
+            
+        except Exception as e:
+            self.logger.error(f"Error starting low battery warning: {e}")
+
+    def _update_warning_animation(self):
+        """Update the warning animation state - called from updateLedStates"""
+        if not self.warning_active:
+            return
+            
+        try:
+            current_time = time.time()
+            elapsed_time = current_time - self.warning_start_time
+            
+            # Flash duration: 0.05 seconds on, 0.05 seconds off (0.1s per complete cycle)
+            flash_cycle_duration = 0.1  # 0.05s on + 0.05s off
+            current_cycle = int(elapsed_time / flash_cycle_duration)
+            time_in_cycle = elapsed_time % flash_cycle_duration
+            
+            # Determine if LEDs should be on or off in current cycle
+            leds_should_be_on = time_in_cycle < 0.05
+            
+            # Update LEDs if state changed or this is the first update
+            if leds_should_be_on != self.warning_led_state:
+                self.warning_led_state = leds_should_be_on
+                
+                for pin in self.ledPinsArr:
+                    GPIO.output(pin, GPIO.HIGH if leds_should_be_on else GPIO.LOW)
+                
+                # If we just completed a full flash cycle (on->off)
+                if not leds_should_be_on and current_cycle > self.warning_flash_count:
+                    self.warning_flash_count = current_cycle
+                    self.logger.debug(f"Warning flash cycle {self.warning_flash_count + 1}/3 completed")
+            
+            # Check if we've completed 3 flash cycles (total duration: 0.3s)
+            if current_cycle >= 3:
+                self._end_warning_sequence()
+                
+        except Exception as e:
+            self.logger.error(f"Error updating warning animation: {e}")
+            self._end_warning_sequence()  # End warning on error
+
+    def _end_warning_sequence(self):
+        """End the warning sequence and restore normal operation"""
+        try:
+            self.warning_active = False
+            self.warning_flash_count = 0
+            self.warning_led_state = False
+            
+            # Restore original LED states if they were saved
+            if self.original_led_states is not None:
+                self.ledPinsArrStatus = self.original_led_states.copy()
+                self.original_led_states = None
+            
+            # Update LEDs to normal state
+            for i, pin in enumerate(self.ledPinsArr):
+                if i < len(self.ledPinsArrStatus):
+                    led_state = GPIO.LOW if self.ledPinsArrStatus[i] == 0 else GPIO.HIGH
+                    GPIO.output(pin, led_state)
+            
+            self.logger.info("Low battery warning sequence completed - normal operation restored")
+            
+        except Exception as e:
+            self.logger.error(f"Error ending warning sequence: {e}")

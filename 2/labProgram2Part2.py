@@ -27,7 +27,7 @@ def signal_handler(signum, frame):
 def battery_discharge_simulation():
     """Simulate battery discharge with random tick speed"""
     global simulation_running
-    current_battery = 100
+    current_battery = 75
     
     logger.info("Starting battery discharge simulation...")
     logger.info("Press Ctrl+C to stop the simulation")
