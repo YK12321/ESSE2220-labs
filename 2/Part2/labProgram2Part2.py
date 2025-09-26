@@ -16,7 +16,7 @@ def signal_handler(signum, frame):
 
 def battery_discharge_simulation():
     global simulation_running
-    current_battery = 75
+    current_battery = 45
     
     print("Starting battery discharge simulation...")
     print("Press Ctrl+C to stop the simulation")

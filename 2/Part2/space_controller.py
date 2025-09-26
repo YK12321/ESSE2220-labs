@@ -19,10 +19,6 @@ class LEDDisplay:
         self.ledPinsArrStatus = ledPinsArrStatus
         self.ledPinsArr = ledPinsArr
         self.gpio_initialized = False
-        self.warning_active = False
-        self.warning_start_time = 0
-        self.warning_led_state = False
-        self.original_led_states = None
         
         self._initialize_gpio()
     
@@ -109,11 +105,6 @@ class LEDDisplay:
             raise LEDDisplayError("GPIO not initialized")
         
         try:
-            self._update_warning_animation()
-            
-            if self.warning_active:
-                return
-            
             for i, pin in enumerate(self.ledPinsArr):
                 if i < len(self.ledPinsArrStatus):
                     GPIO.output(pin, GPIO.HIGH if self.ledPinsArrStatus[i] == 0 else GPIO.LOW)
@@ -130,51 +121,20 @@ class LEDDisplay:
                 self.gpio_initialized = False
             except Exception:
                 pass
-    
     def triggerLowBatteryWarning(self):
-        if not self.gpio_initialized or len(self.ledPinsArr) == 0 or self.warning_active:
-            return
-        
-        try:
-            self.original_led_states = self.ledPinsArrStatus.copy()
-            self.warning_active = True
-            self.warning_start_time = time.time()
-            self.warning_led_state = False
-        except Exception:
-            pass
-
-    def _update_warning_animation(self):
-        if not self.warning_active:
+        if not self.gpio_initialized or len(self.ledPinsArr) == 0:
             return
             
         try:
-            elapsed_time = time.time() - self.warning_start_time
-            flash_cycle_duration = 0.1
-            time_in_cycle = elapsed_time % flash_cycle_duration
-            leds_should_be_on = time_in_cycle < 0.05
-            
-            if leds_should_be_on != self.warning_led_state:
-                self.warning_led_state = leds_should_be_on
+            blinks = 3
+            timeBetweenBlinks = 0.01
+            timeOfBlink = 0.2
+            for i in range(blinks):
                 for pin in self.ledPinsArr:
-                    GPIO.output(pin, GPIO.HIGH if leds_should_be_on else GPIO.LOW)
-            
-            if elapsed_time >= 0.3:
-                self._end_warning_sequence()
-        except Exception:
-            self._end_warning_sequence()
-
-    def _end_warning_sequence(self):
-        try:
-            self.warning_active = False
-            self.warning_led_state = False
-            
-            if self.original_led_states is not None:
-                self.ledPinsArrStatus = self.original_led_states.copy()
-                self.original_led_states = None
-            
-            for i, pin in enumerate(self.ledPinsArr):
-                if i < len(self.ledPinsArrStatus):
-                    led_state = GPIO.LOW if self.ledPinsArrStatus[i] == 0 else GPIO.HIGH
-                    GPIO.output(pin, led_state)
+                    GPIO.output(pin, GPIO.HIGH)
+                time.sleep(timeOfBlink)
+                for pin in self.ledPinsArr:
+                    GPIO.output(pin, GPIO.LOW)
+                time.sleep(timeBetweenBlinks)
         except Exception:
             pass
