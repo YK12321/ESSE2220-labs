@@ -137,24 +137,79 @@ def readRawJoystickPosition(adc):
     y_value = adc.analogRead(1)  # Channel 1 for Y-axis
     return x_value, y_value
 
-def fixRawToCalibrated(x_raw, y_raw, center, scale, tol, deadZone = .1):
-    # Apply dead zone
-    if abs((x_raw - center)/127 * scale) < deadZone:
+def fixRawToCalibrated(x_raw, y_raw, center, scale, tol, deadZone=0.1):
+    """
+    Convert raw ADC values to calibrated coordinate values with dead zone
+    
+    Transforms raw joystick readings (0-255) to normalized coordinates centered
+    at zero. Applies a dead zone to filter out small unintentional movements.
+    
+    Args:
+        x_raw: Raw X-axis ADC value (0-255)
+        y_raw: Raw Y-axis ADC value (0-255)
+        center: Center position of joystick (typically 128 for 8-bit ADC)
+        scale: Scaling factor for output range
+        tol: Tolerance value (unused in current implementation)
+        deadZone: Dead zone threshold for ignoring small movements (default: 0.1)
+        
+    Returns:
+        numpy.ndarray: Calibrated [x, y] coordinates
+    """
+    # Apply dead zone to filter out small unintentional movements
+    # If movement is within dead zone, treat as centered (no movement)
+    if abs((x_raw - center) / 127 * scale) < deadZone:
         x_raw = center
-    if abs((y_raw - center)/127 * scale) < deadZone:
+    if abs((y_raw - center) / 127 * scale) < deadZone:
         y_raw = center
-    nx = ((x_raw-center)/127) * scale
-    ny = ((y_raw-center)/127) * scale
+    
+    # Normalize coordinates: center at 0, scale by range and factor
+    # Divide by 127 (half of 255) to get range of approximately -1 to 1
+    nx = ((x_raw - center) / 127) * scale
+    ny = ((y_raw - center) / 127) * scale
+    
     return np.array([nx, ny])
 
 
 def updatePosition(currentPos, delta, isBoostEnabled, boostFactor):
+    """
+    Update current position based on joystick movement with optional boost
+    
+    Calculates new position by applying delta movement to current position.
+    If boost is enabled (Z-button pressed), movement is amplified by boost factor.
+    
+    Args:
+        currentPos: Current position as numpy array [x, y]
+        delta: Movement delta from joystick as numpy array [dx, dy]
+        isBoostEnabled: Boolean indicating if boost mode is active (Z-button pressed)
+        boostFactor: Multiplier for movement when boost is enabled
+        
+    Returns:
+        numpy.ndarray: New position [x, y] after applying movement
+    """
+    # Apply boost multiplier if Z-button is pressed
     if isBoostEnabled:
         delta *= boostFactor
+    
+    # Calculate new position by adding delta to current position
     newPos = currentPos + delta
     return newPos
 
 def comparePositions(pos1, pos2, tol):
+    """
+    Check if two positions are within tolerance of each other
+    
+    Determines if the distance between two positions is within the specified
+    tolerance for both X and Y coordinates. Used to check if target has been reached.
+    
+    Args:
+        pos1: First position as numpy array [x, y]
+        pos2: Second position as numpy array [x, y]
+        tol: Maximum allowed difference for each coordinate
+        
+    Returns:
+        bool: True if both coordinates are within tolerance, False otherwise
+    """
+    # Check if absolute difference in both X and Y is within tolerance
     return np.all(np.abs(pos1 - pos2) <= tol)
 
 # ============================================================================
@@ -180,35 +235,46 @@ def main():
     print(f"\n=== Initial Joystick Position ===")
     print(f"X: {x_pos}, Y: {y_pos}")
     print(f"Raw: ({x_pos}, {y_pos})")
-    CENTER = 128
-    SCALE = 1
-    TOL = .5
-    boostFactor = 1.5
+    
+    # Calibration constants
+    CENTER = 128         # Center value for 8-bit ADC (midpoint of 0-255)
+    SCALE = 1            # Scaling factor for coordinate normalization
+    TOL = 0.5            # Tolerance for position comparison (units)
+    boostFactor = 1.5    # Speed multiplier when Z-button is pressed
+    
     print(f"Calibrated: ({fixRawToCalibrated(x_pos, y_pos, CENTER, SCALE, TOL)})")
 
+    # Position tracking control loop
     reachedTarget = False
-    if(comparePositions(initialPos, finalPos, TOL)):
+    
+    # Check if already at target position
+    if comparePositions(initialPos, finalPos, TOL):
         reachedTarget = True
         print("Initial position is the same as final position. No movement needed.")
     else:
+        # Main control loop - continue until target is reached
         while not reachedTarget:
+            # Read current joystick position
             x_pos, y_pos = readRawJoystickPosition(adc)
             calibratedPos = fixRawToCalibrated(x_pos, y_pos, CENTER, SCALE, TOL)
             print(f"\nCurrent Joystick Position: {calibratedPos}")
             
-            # Update current position based on joystick input
+            # Check if Z-button (boost) is pressed (active LOW)
             isBoostEnabled = GPIO.input(Z_PIN) == GPIO.LOW
+            
+            # Update current position based on joystick input and boost status
             initialPos = updatePosition(initialPos, calibratedPos, isBoostEnabled, boostFactor)
             print(f"Updated Position: {initialPos}")
+            
             if isBoostEnabled:
                 print("Boost Enabled on this movement!")
             
-            # Check if target is reached within tolerance
+            # Check if target position is reached within tolerance
             if np.all(np.abs(initialPos - finalPos) <= TOL):
                 reachedTarget = True
                 print("Reached target position!")
             
-            time.sleep(0.5)  # Delay for readability
+            time.sleep(0.5)  # Update interval for smooth control
 
 
 
