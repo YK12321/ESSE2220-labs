@@ -17,11 +17,14 @@ fileName = "distance_log.txt"
 csvFileName = "distance_log.csv"
 
 def writeToLog(sensorReading, time, iteration):
+    # Use try-except to avoid program crash
     try:
+        # Write to text file
         with open(fileName, "a") as f:
             if(iteration == 1):
                 f.write("time_s    distance_cm\n")
             f.write(f"{time:.3f}    {sensorReading:.2f}\n")
+        # Also write to CSV file
         with open(csvFileName, "a", newline='') as csvfile:
             csvwriter = csv.writer(csvfile)
             if(iteration == 1):
@@ -57,7 +60,10 @@ def setup():
     GPIO.setup(echoPin, GPIO.IN)    # set echoPin to INPUT mode
 
 def loop():
+    # Start with iteration 1
     iteration = 1
+
+    # Clear previous log files / create new ones at the start
     with open(fileName, "w") as f:
         f.write("")  # clear the log file at the start
     with open(csvFileName, "w", newline='') as csvfile:
