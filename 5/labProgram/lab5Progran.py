@@ -5,7 +5,7 @@
 # auther      : www.freenove.com
 # modification: 2019/12/28
 ########################################################################
-import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO #type: ignore
 import time
 import csv
 
@@ -19,6 +19,10 @@ csvFileName = "distance_log.csv"
 def writeToLog(sensorReading, time, iteration):
     # Use try-except to avoid program crash
     try:
+        # Print to console
+        if(iteration == 1):
+            print("time_s    distance_cm")
+        print(f"{time:.3f}    {sensorReading:.2f}")
         # Write to text file
         with open(fileName, "a") as f:
             if(iteration == 1):
