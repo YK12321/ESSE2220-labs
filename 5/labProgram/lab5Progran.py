@@ -71,8 +71,11 @@ def loop():
 
     while(True):
         distance = getSonar() # get distance
+        # Add delay of 0.1 second between measurements
         time.sleep(0.1)
+        # Write distance to log files
         writeToLog(distance, iteration*0.1, iteration)
+        # Add iteration count to track time in log
         iteration = iteration + 1
         
 if __name__ == '__main__':     # Program entrance
