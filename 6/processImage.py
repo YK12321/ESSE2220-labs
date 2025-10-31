@@ -27,15 +27,30 @@ def canny(image):
     edges = cv2.Canny(image, 100, 200)
     return edges
 
-def convertToBinary(image, threshold=127):
-    """Convert a grayscale image to a binary image using the specified threshold."""
-    _, binary_image = cv2.threshold(image, threshold, 1, cv2.THRESH_BINARY)
+def convertToBinary(image, threshold=127, invert=False):
+    """Convert a grayscale image to a binary image using the specified threshold.
+    
+    Args:
+        image: Grayscale image
+        threshold: Pixel values above this become 1 (white), below become 0 (black)
+        invert: If True, invert the binary output (1 becomes 0, 0 becomes 1)
+    """
+    if invert:
+        _, binary_image = cv2.threshold(image, threshold, 1, cv2.THRESH_BINARY_INV)
+    else:
+        _, binary_image = cv2.threshold(image, threshold, 1, cv2.THRESH_BINARY)
     return binary_image
 
-def convertToHex(binary_image):
-    """Convert a binary image to hexadecimal representation for LED matrix."""
+def convertToHex(binary_image, reverse_bits=False):
+    """Convert a binary image to hexadecimal representation for LED matrix.
+    
+    Args:
+        binary_image: 8x8 binary image where 1=LED on, 0=LED off
+        reverse_bits: If True, reverse the bit order in each row (MSB<->LSB)
+    """
     hex_data = []
-    for row in binary_image:
+    print("\n=== Binary to Hex Conversion ===")
+    for row_idx, row in enumerate(binary_image):
         # Ensure we only take 8 bits (8 pixels) per row
         row_flat = row.flatten() if len(row.shape) > 1 else row
         # Take only first 8 bits if row is longer
@@ -43,10 +58,17 @@ def convertToHex(binary_image):
         # Pad with zeros if row is shorter than 8 bits
         if len(row_8bit) < 8:
             row_8bit = np.pad(row_8bit, (0, 8 - len(row_8bit)), 'constant')
+        
+        # Reverse bits if needed (some LED matrices scan MSB first, others LSB first)
+        if reverse_bits:
+            row_8bit = row_8bit[::-1]
+        
         bits = ''.join(str(int(bit)) for bit in row_8bit)
         # Convert to integer (removing the '0x' prefix issue)
         hex_value = int(bits, 2)
         hex_data.append(hex_value)
+        print(f"Row {row_idx}: {bits} = {hex_value:3d} = 0x{hex_value:02x}")
+    print("================================\n")
     return hex_data
 
 if __name__ == '__main__':
@@ -81,13 +103,21 @@ if __name__ == '__main__':
         print(f"Processed 8x8:  min={processed_8x8.min()}, max={processed_8x8.max()}")
         
         # Convert all methods to binary for comparison
-        binary_original = convertToBinary(resized_8x8)
-        binary_sobel = convertToBinary(sobel_8x8)
-        binary_canny = convertToBinary(canny_8x8)
+        # Set invert=True if you want dark pixels in image = LED on (common for displaying dark images on bright LEDs)
+        invert_binary = True  # Change to False if LEDs should match white pixels in image
         
-        print(f"Binary original: min={binary_original.min()}, max={binary_original.max()}")
+        binary_original = convertToBinary(resized_8x8, threshold=127, invert=invert_binary)
+        binary_sobel = convertToBinary(sobel_8x8, threshold=127, invert=False)  # Edge detection typically doesn't need inversion
+        binary_canny = convertToBinary(canny_8x8, threshold=127, invert=False)
+        
+        print(f"Binary original (inverted={invert_binary}): min={binary_original.min()}, max={binary_original.max()}")
         print(f"Binary sobel:    min={binary_sobel.min()}, max={binary_sobel.max()}")
         print(f"Binary canny:    min={binary_canny.min()}, max={binary_canny.max()}")
+        
+        # Print actual 8x8 binary pattern for original
+        print("\n8x8 Binary Original Pattern (1=LED on, 0=LED off):")
+        for row in binary_original:
+            print(''.join(str(int(pixel)) for pixel in row))
         print("==========================================\n")
         
         # Create scaled versions for display
@@ -120,9 +150,15 @@ if __name__ == '__main__':
         cv2.imshow("6. Binary Canny", binary_canny_large)
         
         # Convert all to hex data
-        hex_binary = convertToHex(binary_original)
-        hex_sobel = convertToHex(binary_sobel)
-        hex_canny = convertToHex(binary_canny)
+        # Try reverse_bits=True if the LED display is mirrored horizontally
+        reverse_bits = False  # Change to True if display is horizontally flipped
+        
+        print("\n--- Converting BINARY to hex ---")
+        hex_binary = convertToHex(binary_original, reverse_bits)
+        print("\n--- Converting SOBEL to hex ---")
+        hex_sobel = convertToHex(binary_sobel, reverse_bits)
+        print("\n--- Converting CANNY to hex ---")
+        hex_canny = convertToHex(binary_canny, reverse_bits)
         
         # Display in format compatible with ledMatrix.py
         print("\nHexadecimal representation for LED Matrix:")
