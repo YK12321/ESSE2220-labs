@@ -15,7 +15,8 @@ def resizeImage(image, size=(8, 8)):
 
 def sobel(image):
     """Apply Sobel edge detection to the image."""
-    sobelx = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=5)
+    # Use ksize=3 for small images (5 is too large for 8x8)
+    sobelx = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=3)
     sobely = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=5)
     sobel_combined = cv2.magnitude(sobelx, sobely)
     sobel_combined = np.uint8(np.clip(sobel_combined, 0, 255))
@@ -54,26 +55,94 @@ if __name__ == '__main__':
         image = loadImage("lab6_8x8_gray.png")
         #gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         gray_image = image #Image provided is already grayscale
-        sobel_image = sobel(gray_image)
-        canny_image = canny(gray_image)
-        gray_image = sobel_image  # Choose which processed image to use
         
-        # Resize to 8x8 if needed
-        resized_image = resizeImage(gray_image, (8, 8))
+        # FIRST: Resize to 8x8
+        resized_8x8 = resizeImage(gray_image, (8, 8))
         
-        binary_image = convertToBinary(resized_image)
-        hex_data = convertToHex(binary_image)
+        # THEN: Apply edge detection on the 8x8 image
+        sobel_8x8 = sobel(resized_8x8)
+        canny_8x8 = canny(resized_8x8)
+        
+        # Choose which processed image to use for LED matrix
+        processed_8x8 = sobel_8x8  # Change to canny_8x8 or resized_8x8 if desired
+        
+        # Create upscaled versions for better viewing (scale 8x8 to 240x240)
+        scale_factor = 30
+        original_large = cv2.resize(resized_8x8, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
+        sobel_large = cv2.resize(sobel_8x8, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
+        canny_large = cv2.resize(canny_8x8, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
+        processed_large = cv2.resize(processed_8x8, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
+        
+        # Print pixel value ranges for debugging
+        print("\n=== Pixel Value Ranges (for debugging) ===")
+        print(f"Original 8x8:   min={resized_8x8.min()}, max={resized_8x8.max()}")
+        print(f"Sobel 8x8:      min={sobel_8x8.min()}, max={sobel_8x8.max()}")
+        print(f"Canny 8x8:      min={canny_8x8.min()}, max={canny_8x8.max()}")
+        print(f"Processed 8x8:  min={processed_8x8.min()}, max={processed_8x8.max()}")
+        
+        # Convert all methods to binary for comparison
+        binary_original = convertToBinary(resized_8x8)
+        binary_sobel = convertToBinary(sobel_8x8)
+        binary_canny = convertToBinary(canny_8x8)
+        
+        print(f"Binary original: min={binary_original.min()}, max={binary_original.max()}")
+        print(f"Binary sobel:    min={binary_sobel.min()}, max={binary_sobel.max()}")
+        print(f"Binary canny:    min={binary_canny.min()}, max={binary_canny.max()}")
+        print("==========================================\n")
+        
+        # Create scaled versions for display
+        binary_original_large = cv2.resize(binary_original * 255, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
+        binary_sobel_large = cv2.resize(binary_sobel * 255, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
+        binary_canny_large = cv2.resize(binary_canny * 255, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
+        
+        # Save all images to files
+        cv2.imwrite("output_original_8x8.png", original_large)
+        cv2.imwrite("output_sobel_8x8.png", sobel_large)
+        cv2.imwrite("output_canny_8x8.png", canny_large)
+        cv2.imwrite("output_binary_original.png", binary_original_large)
+        cv2.imwrite("output_binary_sobel.png", binary_sobel_large)
+        cv2.imwrite("output_binary_canny.png", binary_canny_large)
+        
+        print("Images saved (all scaled up 30x for viewing):")
+        print("  - output_original_8x8.png (Original resized to 8x8)")
+        print("  - output_sobel_8x8.png (Sobel edge detection on 8x8)")
+        print("  - output_canny_8x8.png (Canny edge detection on 8x8)")
+        print("  - output_binary_original.png (Binary of original)")
+        print("  - output_binary_sobel.png (Binary of Sobel - for LED)")
+        print("  - output_binary_canny.png (Binary of Canny - for LED)")
+        
+        # Display images in windows
+        cv2.imshow("1. Original 8x8", original_large)
+        cv2.imshow("2. Sobel 8x8", sobel_large)
+        cv2.imshow("3. Canny 8x8", canny_large)
+        cv2.imshow("4. Binary Original", binary_original_large)
+        cv2.imshow("5. Binary Sobel", binary_sobel_large)
+        cv2.imshow("6. Binary Canny", binary_canny_large)
+        
+        # Convert all to hex data
+        hex_binary = convertToHex(binary_original)
+        hex_sobel = convertToHex(binary_sobel)
+        hex_canny = convertToHex(binary_canny)
         
         # Display in format compatible with ledMatrix.py
-        print("Hexadecimal representation for LED Matrix:")
-        print(f"pic = {hex_data}")
-        
+        print("\nHexadecimal representation for LED Matrix:")
+        print(f"binarypic = {hex_binary}")
+        print(f"sobelpic = {hex_sobel}")
+        print(f"cannypic = {hex_canny}")
+
         # Also save to file
         with open("imageHexData.dat", "w") as f:
-            f.write(f"pic = {hex_data}\n")
+            f.write(f"binarypic = {hex_binary}\n")
+            f.write(f"sobelpic = {hex_sobel}\n")
+            f.write(f"cannypic = {hex_canny}\n")
         
         print("\nData saved to imageHexData.dat")
-        print(f"Number of rows: {len(hex_data)}")
+        print(f"Number of rows: {len(hex_sobel)}")
+        
+        # Wait for key press to close windows
+        print("\nPress any key in the image window to close...")
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     except FileNotFoundError as e:
         print(e)
