@@ -15,7 +15,7 @@ dataPin   = 11      # DS Pin of 74HC595(Pin14)
 latchPin  = 13      # ST_CP Pin of 74HC595(Pin12)
 clockPin = 15       # SH_CP Pin of 74HC595(Pin11)
 # Image data from imageHexData.dat
-binarypic = [0, 31, 31, 31, 0, 0, 0, 0]
+binarypic = [255, 224, 224, 224, 255, 255, 255, 255]
 sobelpic = [31, 255, 31, 255, 255, 255, 255, 31]
 cannypic = [105, 81, 139, 80, 100, 73, 136, 41]
 

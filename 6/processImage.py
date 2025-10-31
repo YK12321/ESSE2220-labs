@@ -117,7 +117,8 @@ if __name__ == '__main__':
         # Print actual 8x8 binary pattern for original
         print("\n8x8 Binary Original Pattern (1=LED on, 0=LED off):")
         for row in binary_original:
-            print(''.join(str(int(pixel)) for pixel in row))
+            row_flat = row.flatten() if len(row.shape) > 1 else row
+            print(''.join(str(int(pixel)) for pixel in row_flat))
         print("==========================================\n")
         
         # Create scaled versions for display
