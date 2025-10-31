@@ -150,16 +150,34 @@ if __name__ == '__main__':
         cv2.imshow("5. Binary Sobel", binary_sobel_large)
         cv2.imshow("6. Binary Canny", binary_canny_large)
         
-        # Convert all to hex data
-        # Try reverse_bits=True if the LED display is mirrored horizontally
+        # IMPORTANT: Read back the saved PNG files and convert them to hex
+        # This ensures we get the same values as imageToData.py
+        print("\n=== Converting SAVED images back to hex data ===")
+        
+        # Read back the saved binary images
+        saved_binary_original = cv2.imread("output_binary_original.png", cv2.IMREAD_GRAYSCALE)
+        saved_binary_sobel = cv2.imread("output_binary_sobel.png", cv2.IMREAD_GRAYSCALE)
+        saved_binary_canny = cv2.imread("output_binary_canny.png", cv2.IMREAD_GRAYSCALE)
+        
+        # Downscale back to 8x8
+        saved_binary_original_8x8 = cv2.resize(saved_binary_original, (8, 8), interpolation=cv2.INTER_NEAREST)
+        saved_binary_sobel_8x8 = cv2.resize(saved_binary_sobel, (8, 8), interpolation=cv2.INTER_NEAREST)
+        saved_binary_canny_8x8 = cv2.resize(saved_binary_canny, (8, 8), interpolation=cv2.INTER_NEAREST)
+        
+        # Convert back to binary (0 and 1)
+        _, saved_binary_original_8x8 = cv2.threshold(saved_binary_original_8x8, 127, 1, cv2.THRESH_BINARY)
+        _, saved_binary_sobel_8x8 = cv2.threshold(saved_binary_sobel_8x8, 127, 1, cv2.THRESH_BINARY)
+        _, saved_binary_canny_8x8 = cv2.threshold(saved_binary_canny_8x8, 127, 1, cv2.THRESH_BINARY)
+        
+        # Convert to hex data
         reverse_bits = False  # Change to True if display is horizontally flipped
         
         print("\n--- Converting BINARY to hex ---")
-        hex_binary = convertToHex(binary_original, reverse_bits)
+        hex_binary = convertToHex(saved_binary_original_8x8, reverse_bits)
         print("\n--- Converting SOBEL to hex ---")
-        hex_sobel = convertToHex(binary_sobel, reverse_bits)
+        hex_sobel = convertToHex(saved_binary_sobel_8x8, reverse_bits)
         print("\n--- Converting CANNY to hex ---")
-        hex_canny = convertToHex(binary_canny, reverse_bits)
+        hex_canny = convertToHex(saved_binary_canny_8x8, reverse_bits)
         
         # Display in format compatible with ledMatrix.py
         print("\nHexadecimal representation for LED Matrix:")

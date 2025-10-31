@@ -1,3 +1,6 @@
+# Image Data for LED Matrix
+# Generated from binary output images
+
 binarypic = [241, 130, 132, 136, 240, 240, 240, 240]
 sobelpic = [96, 255, 127, 255, 255, 255, 255, 126]
 cannypic = [105, 81, 139, 80, 100, 73, 136, 41]
