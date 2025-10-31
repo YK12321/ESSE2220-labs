@@ -56,7 +56,7 @@ if __name__ == '__main__':
         gray_image = image #Image provided is already grayscale
         sobel_image = sobel(gray_image)
         canny_image = canny(gray_image)
-        gray_image = canny_image
+        gray_image = sobel_image  # Choose which processed image to use
         
         # Resize to 8x8 if needed
         resized_image = resizeImage(gray_image, (8, 8))
