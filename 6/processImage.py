@@ -14,10 +14,17 @@ def resizeImage(image, size=(8, 8)):
     return resized
 
 def sobel(image):
-    pass  # Placeholder for Sobel function if needed later
+    """Apply Sobel edge detection to the image."""
+    sobelx = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=5)
+    sobely = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=5)
+    sobel_combined = cv2.magnitude(sobelx, sobely)
+    sobel_combined = np.uint8(np.clip(sobel_combined, 0, 255))
+    return sobel_combined
 
 def canny(image):
-    pass  # Placeholder for Canny function if needed later
+    """Apply Canny edge detection to the image."""
+    edges = cv2.Canny(image, 100, 200)
+    return edges
 
 def convertToBinary(image, threshold=127):
     """Convert a grayscale image to a binary image using the specified threshold."""
@@ -47,6 +54,9 @@ if __name__ == '__main__':
         image = loadImage("lab6_8x8_gray.png")
         #gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         gray_image = image #Image provided is already grayscale
+        sobel_image = sobel(gray_image)
+        canny_image = canny(gray_image)
+        gray_image = canny_image
         
         # Resize to 8x8 if needed
         resized_image = resizeImage(gray_image, (8, 8))
