@@ -14,14 +14,52 @@ MSBFIRST = 2
 dataPin   = 11      # DS Pin of 74HC595(Pin14)
 latchPin  = 13      # ST_CP Pin of 74HC595(Pin12)
 clockPin = 15       # SH_CP Pin of 74HC595(Pin11)
-# Image data from imageHexData.dat
-binarypic = [241, 130, 132, 136, 240, 240, 240, 240]
-sobelpic = [96, 255, 127, 255, 255, 255, 255, 126]
-cannypic = [105, 81, 139, 80, 100, 73, 136, 41]
+def reverseBits(byte):
+    """Reverse the bits in a byte (mirror horizontally)."""
+    result = 0
+    for i in range(8):
+        if byte & (1 << i):
+            result |= (1 << (7 - i))
+    return result
+
+def mirrorHorizontal(pattern):
+    """Mirror a pattern horizontally by reversing bits in each row."""
+    return [reverseBits(byte) for byte in pattern]
+
+def rotateLeft90(pattern):
+    """Rotate pattern 90 degrees counter-clockwise (left)."""
+    # Convert bytes to 8x8 bit array
+    bits = []
+    for byte in pattern:
+        row = [(byte >> (7-i)) & 1 for i in range(8)]
+        bits.append(row)
+    
+    # Rotate: new[row][col] = old[col][7-row]
+    rotated = [[bits[col][7-row] for col in range(8)] for row in range(8)]
+    
+    # Convert back to bytes
+    result = []
+    for row in rotated:
+        byte = 0
+        for i, bit in enumerate(row):
+            byte |= (bit << (7-i))
+        result.append(byte)
+    return result
+
+# Image data from imageHexData.dat (raw values)
+binarypic_raw = [241, 130, 132, 136, 240, 240, 240, 240]
+sobelpic_raw = [96, 255, 127, 255, 255, 255, 255, 126]
+cannypic_raw = [105, 81, 139, 80, 100, 73, 136, 41]
+
+# Fix orientation: mirror horizontally then rotate left 90 degrees
+binarypic = rotateLeft90(mirrorHorizontal(binarypic_raw))
+sobelpic = rotateLeft90(mirrorHorizontal(sobelpic_raw))
+cannypic = rotateLeft90(mirrorHorizontal(cannypic_raw))
 
 # Letter patterns
 letter_B = [0x00, 0x00, 0x7F, 0x49, 0x49, 0x36, 0x00, 0x00]  # "B"
-letter_S = [0x00, 0x00, 0x46, 0x49, 0x49, 0x31, 0x00, 0x00]  # "S"
+letter_S_raw = [0x00, 0x00, 0x46, 0x49, 0x49, 0x31, 0x00, 0x00]  # "S" (mirrored)
+letter_S = mirrorHorizontal(letter_S_raw)  # Fix horizontal mirror
 letter_C = [0x00, 0x00, 0x3E, 0x41, 0x41, 0x22, 0x00, 0x00]  # "C"
 blank = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]     # Blank screen
 
