@@ -9,21 +9,25 @@ def loadImage(path):
     return image
 
 def resizeImage(image, size=(8, 8)):
-    """Resize image to specified dimensions (default 8x8 for LED matrix)."""
+    """Resize image to specified dimensions (default 8x8 for LED matrix).
+    Uses INTER_AREA interpolation for better downsampling quality."""
     resized = cv2.resize(image, size, interpolation=cv2.INTER_AREA)
     return resized
 
 def sobel(image):
-    """Apply Sobel edge detection to the image."""
+    """Apply Sobel edge detection to the image.
+    Computes gradients in X and Y directions, then combines them using magnitude."""
     # Use ksize=3 for small images (5 is too large for 8x8)
-    sobelx = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=3)
-    sobely = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=5)
+    sobelx = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=3)  # Horizontal edges
+    sobely = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=5)  # Vertical edges
+    # Combine X and Y gradients using magnitude
     sobel_combined = cv2.magnitude(sobelx, sobely)
     sobel_combined = np.uint8(np.clip(sobel_combined, 0, 255))
     return sobel_combined
 
 def canny(image):
-    """Apply Canny edge detection to the image."""
+    """Apply Canny edge detection to the image.
+    Uses hysteresis thresholding with lower threshold=100, upper threshold=200."""
     edges = cv2.Canny(image, 100, 200)
     return edges
 
@@ -36,13 +40,16 @@ def convertToBinary(image, threshold=127, invert=False):
         invert: If True, invert the binary output (1 becomes 0, 0 becomes 1)
     """
     if invert:
+        # Inverted: dark pixels in original → LED on (1)
         _, binary_image = cv2.threshold(image, threshold, 1, cv2.THRESH_BINARY_INV)
     else:
+        # Normal: bright pixels in original → LED on (1)
         _, binary_image = cv2.threshold(image, threshold, 1, cv2.THRESH_BINARY)
     return binary_image
 
 def convertToHex(binary_image, reverse_bits=False):
     """Convert a binary image to hexadecimal representation for LED matrix.
+    Each row of 8 pixels becomes one byte (hex value).
     
     Args:
         binary_image: 8x8 binary image where 1=LED on, 0=LED off
@@ -59,12 +66,13 @@ def convertToHex(binary_image, reverse_bits=False):
         if len(row_8bit) < 8:
             row_8bit = np.pad(row_8bit, (0, 8 - len(row_8bit)), 'constant')
         
-        # Reverse bits if needed (some LED matrices scan MSB first, others LSB first)
+        # Reverse bits if needed (for LED matrices with different scan directions)
         if reverse_bits:
             row_8bit = row_8bit[::-1]
         
+        # Convert binary array to bit string
         bits = ''.join(str(int(bit)) for bit in row_8bit)
-        # Convert to integer (removing the '0x' prefix issue)
+        # Convert bit string to integer (base 2)
         hex_value = int(bits, 2)
         hex_data.append(hex_value)
         print(f"Row {row_idx}: {bits} = {hex_value:3d} = 0x{hex_value:02x}")
@@ -74,40 +82,38 @@ def convertToHex(binary_image, reverse_bits=False):
 if __name__ == '__main__':
     print('Program is starting...')
     try:
+        # Load the input image
         image = loadImage("lab6_8x8_gray.png")
-        #gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        gray_image = image #Image provided is already grayscale
+        gray_image = image  # Image provided is already grayscale
         
-        # FIRST: Resize to 8x8
+        # FIRST: Resize to 8x8 (LED matrix dimensions)
         resized_8x8 = resizeImage(gray_image, (8, 8))
         
-        # THEN: Apply edge detection on the 8x8 image
+        # THEN: Apply edge detection algorithms on the 8x8 image
         sobel_8x8 = sobel(resized_8x8)
         canny_8x8 = canny(resized_8x8)
         
-        # Choose which processed image to use for LED matrix
-        processed_8x8 = sobel_8x8  # Change to canny_8x8 or resized_8x8 if desired
-        
         # Create upscaled versions for better viewing (scale 8x8 to 240x240)
         scale_factor = 30
-        original_large = cv2.resize(resized_8x8, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
-        sobel_large = cv2.resize(sobel_8x8, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
-        canny_large = cv2.resize(canny_8x8, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
-        processed_large = cv2.resize(processed_8x8, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
+        original_large = cv2.resize(resized_8x8, (8 * scale_factor, 8 * scale_factor), 
+                                   interpolation=cv2.INTER_NEAREST)
+        sobel_large = cv2.resize(sobel_8x8, (8 * scale_factor, 8 * scale_factor), 
+                                interpolation=cv2.INTER_NEAREST)
+        canny_large = cv2.resize(canny_8x8, (8 * scale_factor, 8 * scale_factor), 
+                                interpolation=cv2.INTER_NEAREST)
         
         # Print pixel value ranges for debugging
         print("\n=== Pixel Value Ranges (for debugging) ===")
         print(f"Original 8x8:   min={resized_8x8.min()}, max={resized_8x8.max()}")
         print(f"Sobel 8x8:      min={sobel_8x8.min()}, max={sobel_8x8.max()}")
         print(f"Canny 8x8:      min={canny_8x8.min()}, max={canny_8x8.max()}")
-        print(f"Processed 8x8:  min={processed_8x8.min()}, max={processed_8x8.max()}")
         
         # Convert all methods to binary for comparison
-        # Set invert=True if you want dark pixels in image = LED on (common for displaying dark images on bright LEDs)
-        invert_binary = True  # Change to False if LEDs should match white pixels in image
+        # Set invert=True if you want dark pixels in image = LED on
+        invert_binary = True  # Change to False if LEDs should match white pixels
         
         binary_original = convertToBinary(resized_8x8, threshold=127, invert=invert_binary)
-        binary_sobel = convertToBinary(sobel_8x8, threshold=127, invert=False)  # Edge detection typically doesn't need inversion
+        binary_sobel = convertToBinary(sobel_8x8, threshold=127, invert=False)
         binary_canny = convertToBinary(canny_8x8, threshold=127, invert=False)
         
         print(f"Binary original (inverted={invert_binary}): min={binary_original.min()}, max={binary_original.max()}")
@@ -122,11 +128,17 @@ if __name__ == '__main__':
         print("==========================================\n")
         
         # Create scaled versions for display
-        binary_original_large = cv2.resize(binary_original * 255, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
-        binary_sobel_large = cv2.resize(binary_sobel * 255, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
-        binary_canny_large = cv2.resize(binary_canny * 255, (8 * scale_factor, 8 * scale_factor), interpolation=cv2.INTER_NEAREST)
+        binary_original_large = cv2.resize(binary_original * 255, 
+                                          (8 * scale_factor, 8 * scale_factor), 
+                                          interpolation=cv2.INTER_NEAREST)
+        binary_sobel_large = cv2.resize(binary_sobel * 255, 
+                                       (8 * scale_factor, 8 * scale_factor), 
+                                       interpolation=cv2.INTER_NEAREST)
+        binary_canny_large = cv2.resize(binary_canny * 255, 
+                                       (8 * scale_factor, 8 * scale_factor), 
+                                       interpolation=cv2.INTER_NEAREST)
         
-        # Save all images to files
+        # Save all images to files for documentation
         cv2.imwrite("output_original_8x8.png", original_large)
         cv2.imwrite("output_sobel_8x8.png", sobel_large)
         cv2.imwrite("output_canny_8x8.png", canny_large)
@@ -150,8 +162,7 @@ if __name__ == '__main__':
         cv2.imshow("5. Binary Sobel", binary_sobel_large)
         cv2.imshow("6. Binary Canny", binary_canny_large)
         
-        # IMPORTANT: Read back the saved PNG files and convert them to hex
-        # This ensures we get the same values as imageToData.py
+        # Convert saved images to hex data for LED matrix
         print("\n=== Converting SAVED images back to hex data ===")
         
         # Read back the saved binary images
@@ -160,16 +171,22 @@ if __name__ == '__main__':
         saved_binary_canny = cv2.imread("output_binary_canny.png", cv2.IMREAD_GRAYSCALE)
         
         # Downscale back to 8x8
-        saved_binary_original_8x8 = cv2.resize(saved_binary_original, (8, 8), interpolation=cv2.INTER_NEAREST)
-        saved_binary_sobel_8x8 = cv2.resize(saved_binary_sobel, (8, 8), interpolation=cv2.INTER_NEAREST)
-        saved_binary_canny_8x8 = cv2.resize(saved_binary_canny, (8, 8), interpolation=cv2.INTER_NEAREST)
+        saved_binary_original_8x8 = cv2.resize(saved_binary_original, (8, 8), 
+                                              interpolation=cv2.INTER_NEAREST)
+        saved_binary_sobel_8x8 = cv2.resize(saved_binary_sobel, (8, 8), 
+                                           interpolation=cv2.INTER_NEAREST)
+        saved_binary_canny_8x8 = cv2.resize(saved_binary_canny, (8, 8), 
+                                           interpolation=cv2.INTER_NEAREST)
         
         # Convert back to binary (0 and 1)
-        _, saved_binary_original_8x8 = cv2.threshold(saved_binary_original_8x8, 127, 1, cv2.THRESH_BINARY)
-        _, saved_binary_sobel_8x8 = cv2.threshold(saved_binary_sobel_8x8, 127, 1, cv2.THRESH_BINARY)
-        _, saved_binary_canny_8x8 = cv2.threshold(saved_binary_canny_8x8, 127, 1, cv2.THRESH_BINARY)
+        _, saved_binary_original_8x8 = cv2.threshold(saved_binary_original_8x8, 127, 1, 
+                                                     cv2.THRESH_BINARY)
+        _, saved_binary_sobel_8x8 = cv2.threshold(saved_binary_sobel_8x8, 127, 1, 
+                                                  cv2.THRESH_BINARY)
+        _, saved_binary_canny_8x8 = cv2.threshold(saved_binary_canny_8x8, 127, 1, 
+                                                  cv2.THRESH_BINARY)
         
-        # Convert to hex data
+        # Convert to hex data for LED matrix
         reverse_bits = False  # Change to True if display is horizontally flipped
         
         print("\n--- Converting BINARY to hex ---")
@@ -185,7 +202,7 @@ if __name__ == '__main__':
         print(f"sobelpic = {hex_sobel}")
         print(f"cannypic = {hex_canny}")
 
-        # Also save to file
+        # Save to file for easy copying to LED matrix code
         with open("imageHexData.dat", "w") as f:
             f.write(f"binarypic = {hex_binary}\n")
             f.write(f"sobelpic = {hex_sobel}\n")
